@@ -1,0 +1,264 @@
+# Paper filtering rules. Matching is case-insensitive and checks title + abstract.
+# A group contributes its weight once when any term in that group is matched.
+
+threshold: 5
+title_bonus: 2
+
+robot_context:
+  - robot
+  - robotic
+  - robotics
+  - embodied
+  - manipulation
+  - manipulator
+  - locomotion
+  - navigation
+  - autonomous agent
+  - physical agent
+  - humanoid
+  - quadruped
+  - legged
+  - drone
+  - uav
+  - quadrotor
+  - aerial
+
+interest_groups:
+  aerial_robotics:
+    weight: 7
+    terms:
+      - uav
+      - drone
+      - quadrotor
+      - aerial robot
+      - aerial robotics
+      - micro aerial vehicle
+      - mav
+      - aerial manipulation
+
+  legged_robotics:
+    weight: 7
+    terms:
+      - quadruped
+      - quadrupedal
+      - legged robot
+      - legged robotics
+      - legged locomotion
+      - robot dog
+      - rough-terrain locomotion
+
+  humanoid_robotics:
+    weight: 7
+    terms:
+      - humanoid
+      - humanoid robot
+      - bipedal robot
+      - biped locomotion
+
+  manipulation:
+    weight: 7
+    terms:
+      - robotic arm
+      - robot arm
+      - robot manipulator
+      - robotic manipulation
+      - robot manipulation
+      - mobile manipulation
+      - mobile manipulator
+      - loco-manipulation
+      - loco manipulation
+      - bimanual manipulation
+      - dual-arm manipulation
+
+  dexterous_manipulation:
+    weight: 8
+    terms:
+      - dexterous hand
+      - robotic hand
+      - robot hand
+      - dexterous manipulation
+      - dexterity
+      - in-hand manipulation
+      - in hand manipulation
+      - tactile manipulation
+
+  vla_foundation_models:
+    weight: 9
+    terms:
+      - vision-language-action
+      - vision language action
+      - vla model
+      - vla policy
+      - robot foundation model
+      - robotic foundation model
+      - generalist robot
+      - generalist robotic policy
+      - language-conditioned robot
+      - language conditioned robot
+
+  embodied_ai:
+    weight: 6
+    terms:
+      - embodied ai
+      - embodied intelligence
+      - embodied reasoning
+      - embodied agent
+      - physical intelligence
+      - robot reasoning
+      - robotic reasoning
+
+  navigation_planning:
+    weight: 5
+    requires_robot_context: true
+    terms:
+      - robot navigation
+      - autonomous navigation
+      - path planning
+      - motion planning
+      - trajectory planning
+      - trajectory optimization
+      - local planning
+      - global planning
+      - navigation policy
+      - collision avoidance
+      - obstacle avoidance
+
+  active_perception_exploration:
+    weight: 7
+    requires_robot_context: true
+    terms:
+      - active perception
+      - active sensing
+      - informative planning
+      - information-aware planning
+      - information aware planning
+      - visibility-aware
+      - visibility aware
+      - field-of-view
+      - field of view
+      - fov-aware
+      - fov constrained
+      - exploration
+      - autonomous exploration
+      - next-best-view
+      - next best view
+
+  world_models:
+    weight: 7
+    requires_robot_context: true
+    terms:
+      - world model
+      - world models
+      - action-conditioned world model
+      - action conditioned world model
+      - predictive world model
+      - latent dynamics
+      - future prediction
+
+  robot_learning:
+    weight: 4
+    requires_robot_context: true
+    terms:
+      - imitation learning
+      - reinforcement learning
+      - behavior cloning
+      - behavioural cloning
+      - diffusion policy
+      - diffusion policies
+      - flow policy
+      - flow matching
+      - action chunking
+      - visuomotor policy
+      - visuomotor policies
+      - sim-to-real
+      - sim2real
+
+  mapping_slam_3d:
+    weight: 4
+    requires_robot_context: true
+    terms:
+      - slam
+      - simultaneous localization and mapping
+      - neural mapping
+      - semantic mapping
+      - 3d mapping
+      - occupancy map
+      - occupancy mapping
+      - gaussian splatting
+      - 3d gaussian splatting
+      - nerf
+      - scene representation
+
+  terrain_traversability:
+    weight: 6
+    requires_robot_context: true
+    terms:
+      - traversability
+      - terrain perception
+      - terrain-aware
+      - terrain aware
+      - rough terrain
+      - negative obstacle
+      - negative obstacles
+      - stairs
+      - staircase
+      - foothold
+      - foothold planning
+
+  tactile_affordance:
+    weight: 5
+    requires_robot_context: true
+    terms:
+      - tactile sensing
+      - tactile perception
+      - visuotactile
+      - visual-tactile
+      - visual tactile
+      - affordance
+      - affordance learning
+      - contact-rich
+      - contact rich
+
+  control:
+    weight: 4
+    requires_robot_context: true
+    terms:
+      - whole-body control
+      - whole body control
+      - model predictive control
+      - nonlinear model predictive control
+      - locomotion control
+      - motion control
+
+# These topics are not absolutely blocked. They subtract score so that a strong
+# transferable robotics method can still pass the threshold.
+negative_groups:
+  low_priority_domains:
+    weight: -6
+    terms:
+      - surgical robot
+      - surgical robotics
+      - rehabilitation robot
+      - rehabilitation robotics
+      - medical robot
+      - medical robotics
+      - social robot
+      - social robotics
+      - human-robot interaction
+      - human robot interaction
+      - swarm robotics
+      - swarm robot
+      - formation control
+      - warehouse scheduling
+      - soft robotics
+      - soft robot
+      - continuum robot
+
+  driving_only:
+    weight: -4
+    terms:
+      - autonomous driving
+      - self-driving
+      - autonomous vehicle
+      - autonomous vehicles
+      - driving policy
