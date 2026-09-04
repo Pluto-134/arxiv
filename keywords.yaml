@@ -57,7 +57,13 @@ interest_groups:
 
   manipulation:
     weight: 7
+    requires_robot_context: true
     terms:
+      - manipulation
+      - grasping
+      - grasp planning
+      - pick-and-place
+      - pick and place
       - robotic arm
       - robot arm
       - robot manipulator
