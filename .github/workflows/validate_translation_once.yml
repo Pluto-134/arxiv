@@ -22,3 +22,5 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Validate bilingual digest without sending email
         run: python send_translated_digest.py --dry-run
+
+# rerun hardened translation
