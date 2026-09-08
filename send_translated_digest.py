@@ -5,28 +5,90 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
+import re
 import sys
 import time
 from datetime import datetime
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
-from deep_translator import GoogleTranslator
-
-from fetch_and_mail import TIMEZONE, fetch_papers, filter_papers, load_rules, send_email
+from fetch_and_mail import TIMEZONE, USER_AGENT, fetch_papers, filter_papers, load_rules, send_email
 
 
 TRANSLATION_FALLBACK = "（翻译暂不可用）"
+TRANSLATE_ENDPOINT = "https://translate.googleapis.com/translate_a/single"
 
 
-def translate_text(text: str, translator: GoogleTranslator) -> str:
+def split_for_translation(text: str, max_chars: int = 2400) -> list[str]:
+    """Split long abstracts at sentence/whitespace boundaries to keep requests small."""
     text = (text or "").strip()
     if not text:
+        return []
+    if len(text) <= max_chars:
+        return [text]
+
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks: list[str] = []
+    current = ""
+    for sentence in sentences:
+        if not sentence:
+            continue
+        if len(sentence) > max_chars:
+            if current:
+                chunks.append(current)
+                current = ""
+            for start in range(0, len(sentence), max_chars):
+                chunks.append(sentence[start : start + max_chars])
+            continue
+        candidate = f"{current} {sentence}".strip()
+        if len(candidate) > max_chars and current:
+            chunks.append(current)
+            current = sentence
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def translate_chunk(text: str) -> str:
+    params = urlencode({"client": "gtx", "sl": "en", "tl": "zh-CN", "dt": "t", "q": text})
+    request = Request(
+        f"{TRANSLATE_ENDPOINT}?{params}",
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+    )
+    with urlopen(request, timeout=20) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    translated = "".join(part[0] for part in payload[0] if part and part[0])
+    return translated.strip()
+
+
+def translate_text(text: str) -> str:
+    chunks = split_for_translation(text)
+    if not chunks:
         return ""
-    try:
-        translated = translator.translate(text)
-        return (translated or "").strip()
-    except Exception as exc:
-        print(f"Warning: translation failed: {exc}", file=sys.stderr)
-        return ""
+
+    translated_chunks: list[str] = []
+    for chunk in chunks:
+        translated = ""
+        for attempt in range(3):
+            try:
+                translated = translate_chunk(chunk)
+                lowered = translated.lower()
+                if translated and "server error" not in lowered and "that's an error" not in lowered:
+                    break
+                translated = ""
+            except Exception as exc:
+                print(f"Warning: translation attempt {attempt + 1} failed: {exc}", file=sys.stderr)
+            time.sleep(0.8 * (attempt + 1))
+
+        if not translated:
+            return ""
+        translated_chunks.append(translated)
+        time.sleep(0.12)
+
+    return " ".join(translated_chunks).strip()
 
 
 def build_translated_email(papers) -> tuple[str, str, str]:
@@ -35,14 +97,10 @@ def build_translated_email(papers) -> tuple[str, str, str]:
     plain_lines = [f"arXiv Robotics Daily — {today}", f"{len(papers)} selected papers", ""]
     html_items: list[str] = []
 
-    translator = GoogleTranslator(source="auto", target="zh-CN")
-
     for idx, paper in enumerate(papers, start=1):
-        zh_title = translate_text(paper.title, translator)
-        # A short pause is friendlier to the public translation endpoint and reduces throttling.
-        time.sleep(0.15)
-        zh_abstract = translate_text(paper.abstract, translator)
-        time.sleep(0.15)
+        print(f"Translating {idx}/{len(papers)}: {paper.title}")
+        zh_title = translate_text(paper.title)
+        zh_abstract = translate_text(paper.abstract)
 
         plain_lines.extend(
             [
