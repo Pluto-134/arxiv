@@ -1,31 +1,96 @@
-# Paper filtering rules. Matching is case-insensitive and checks title + abstract.
-# A group contributes its weight once when any term in that group is matched.
+# High-precision robotics paper filtering rules.
+# Stage 1: an explicit robotics/embodied anchor OR cs.RO membership is required.
+# Stage 2: interest groups are scored from title + abstract.
 
 threshold: 5
 title_bonus: 2
 
-robot_context:
+# These terms are allowed to prove robotics/embodied relevance by themselves.
+# Generic words such as manipulation/navigation/world model are intentionally NOT here.
+strong_robot_anchors:
   - robot
   - robotic
   - robotics
-  - embodied
-  - manipulation
+  - autonomous robot
+  - mobile robot
+  - field robot
+  - service robot
   - manipulator
-  - locomotion
-  - navigation
-  - autonomous agent
-  - physical agent
+  - robotic arm
+  - robot arm
+  - robotic hand
+  - robot hand
+  - dexterous hand
+  - robot manipulation
+  - robotic manipulation
+  - robotic grasping
+  - mobile manipulation
+  - loco-manipulation
   - humanoid
+  - humanoid robot
+  - bipedal robot
   - quadruped
-  - legged
-  - drone
+  - quadrupedal
+  - legged robot
+  - legged robotics
+  - robot locomotion
   - uav
+  - drone
   - quadrotor
-  - aerial
+  - aerial robot
+  - aerial robotics
+  - micro aerial vehicle
+  - embodied ai
+  - embodied intelligence
+  - embodied agent
+  - embodied reasoning
+  - embodied navigation
+  - embodied manipulation
+  - physical ai
+  - physical intelligence
+  - vision-language-action
+  - vision language action
+  - vla model
+  - vla models
+  - vla policy
+  - vla policies
+  - robot foundation model
+  - robotic foundation model
+  - generalist robot
+  - robot policy
+  - robotic policy
+  - vision-language navigation
+  - vision language navigation
+  - task and motion planning
+  - whole-body control
+  - whole body control
+
+# Small ranking prior. It does not bypass the interest-score threshold.
+category_bonus:
+  cs.RO: 1
 
 interest_groups:
+  vla_foundation_models:
+    weight: 10
+    terms:
+      - vision-language-action
+      - vision language action
+      - vla model
+      - vla models
+      - vla policy
+      - vla policies
+      - robot foundation model
+      - robotic foundation model
+      - generalist robot
+      - generalist robotic policy
+      - robot policy
+      - robotic policy
+      - language-conditioned robot
+      - language conditioned robot
+      - multimodal robot policy
+
   aerial_robotics:
-    weight: 7
+    weight: 8
     terms:
       - uav
       - drone
@@ -35,9 +100,11 @@ interest_groups:
       - micro aerial vehicle
       - mav
       - aerial manipulation
+      - agile flight
+      - autonomous flight
 
   legged_robotics:
-    weight: 7
+    weight: 8
     terms:
       - quadruped
       - quadrupedal
@@ -46,18 +113,33 @@ interest_groups:
       - legged locomotion
       - robot dog
       - rough-terrain locomotion
+      - locomotion policy
 
   humanoid_robotics:
-    weight: 7
+    weight: 8
     terms:
       - humanoid
       - humanoid robot
       - bipedal robot
       - biped locomotion
+      - humanoid locomotion
+
+  dexterous_manipulation:
+    weight: 9
+    terms:
+      - dexterous hand
+      - robotic hand
+      - robot hand
+      - dexterous manipulation
+      - dexterity
+      - in-hand manipulation
+      - in hand manipulation
+      - tactile manipulation
+      - dexterous grasping
+      - hand-object interaction
 
   manipulation:
     weight: 7
-    requires_robot_context: true
     terms:
       - manipulation
       - grasping
@@ -75,63 +157,32 @@ interest_groups:
       - loco manipulation
       - bimanual manipulation
       - dual-arm manipulation
+      - whole-body manipulation
+      - whole body manipulation
+      - contact-rich manipulation
+      - contact rich manipulation
+      - force control
+      - language-conditioned manipulation
+      - language conditioned manipulation
 
-  dexterous_manipulation:
-    weight: 8
-    terms:
-      - dexterous hand
-      - robotic hand
-      - robot hand
-      - dexterous manipulation
-      - dexterity
-      - in-hand manipulation
-      - in hand manipulation
-      - tactile manipulation
-
-  vla_foundation_models:
-    weight: 9
-    terms:
-      - vision-language-action
-      - vision language action
-      - vla model
-      - vla policy
-      - robot foundation model
-      - robotic foundation model
-      - generalist robot
-      - generalist robotic policy
-      - language-conditioned robot
-      - language conditioned robot
-
-  embodied_ai:
-    weight: 6
+  embodied_ai_reasoning:
+    weight: 7
     terms:
       - embodied ai
       - embodied intelligence
       - embodied reasoning
       - embodied agent
+      - physical ai
       - physical intelligence
       - robot reasoning
       - robotic reasoning
-
-  navigation_planning:
-    weight: 5
-    requires_robot_context: true
-    terms:
-      - robot navigation
-      - autonomous navigation
-      - path planning
-      - motion planning
-      - trajectory planning
-      - trajectory optimization
-      - local planning
-      - global planning
-      - navigation policy
-      - collision avoidance
-      - obstacle avoidance
+      - spatial reasoning
+      - physical reasoning
+      - 3d reasoning
+      - long-horizon reasoning
 
   active_perception_exploration:
-    weight: 7
-    requires_robot_context: true
+    weight: 8
     terms:
       - active perception
       - active sensing
@@ -148,56 +199,53 @@ interest_groups:
       - autonomous exploration
       - next-best-view
       - next best view
+      - viewpoint planning
+      - perception-aware planning
+      - perception aware planning
 
   world_models:
     weight: 7
-    requires_robot_context: true
     terms:
       - world model
       - world models
+      - robot world model
+      - robotic world model
       - action-conditioned world model
       - action conditioned world model
       - predictive world model
+      - world-action model
+      - world action model
       - latent dynamics
       - future prediction
+      - action-conditioned video
+      - action conditioned video
+      - predictive video model
 
-  robot_learning:
-    weight: 4
-    requires_robot_context: true
+  navigation_planning:
+    weight: 6
     terms:
-      - imitation learning
-      - reinforcement learning
-      - behavior cloning
-      - behavioural cloning
-      - diffusion policy
-      - diffusion policies
-      - flow policy
-      - flow matching
-      - action chunking
-      - visuomotor policy
-      - visuomotor policies
-      - sim-to-real
-      - sim2real
-
-  mapping_slam_3d:
-    weight: 4
-    requires_robot_context: true
-    terms:
-      - slam
-      - simultaneous localization and mapping
-      - neural mapping
-      - semantic mapping
-      - 3d mapping
-      - occupancy map
-      - occupancy mapping
-      - gaussian splatting
-      - 3d gaussian splatting
-      - nerf
-      - scene representation
+      - robot navigation
+      - autonomous navigation
+      - embodied navigation
+      - vision-language navigation
+      - vision language navigation
+      - vln
+      - path planning
+      - motion planning
+      - trajectory planning
+      - trajectory optimization
+      - local planning
+      - global planning
+      - navigation policy
+      - collision avoidance
+      - obstacle avoidance
+      - task and motion planning
+      - tamp
+      - language-conditioned navigation
+      - language conditioned navigation
 
   terrain_traversability:
-    weight: 6
-    requires_robot_context: true
+    weight: 7
     terms:
       - traversability
       - terrain perception
@@ -210,10 +258,11 @@ interest_groups:
       - staircase
       - foothold
       - foothold planning
+      - terrain mapping
+      - terrain reconstruction
 
   tactile_affordance:
-    weight: 5
-    requires_robot_context: true
+    weight: 6
     terms:
       - tactile sensing
       - tactile perception
@@ -224,10 +273,54 @@ interest_groups:
       - affordance learning
       - contact-rich
       - contact rich
+      - force sensing
+      - haptic sensing
+
+  mapping_slam_3d:
+    weight: 5
+    terms:
+      - slam
+      - simultaneous localization and mapping
+      - neural mapping
+      - semantic mapping
+      - 3d mapping
+      - occupancy map
+      - occupancy mapping
+      - gaussian splatting
+      - 3d gaussian splatting
+      - nerf
+      - scene representation
+      - scene graph
+      - neural implicit map
+
+  robot_learning:
+    weight: 4
+    terms:
+      - robot learning
+      - imitation learning
+      - reinforcement learning
+      - behavior cloning
+      - behavioural cloning
+      - learning from demonstration
+      - robot demonstration
+      - robot demonstrations
+      - diffusion policy
+      - diffusion policies
+      - flow policy
+      - flow matching
+      - action chunking
+      - visuomotor policy
+      - visuomotor policies
+      - sim-to-real
+      - sim2real
+      - online rl
+      - offline rl
+      - policy learning
+      - teleoperation
+      - robot data
 
   control:
     weight: 4
-    requires_robot_context: true
     terms:
       - whole-body control
       - whole body control
@@ -235,12 +328,14 @@ interest_groups:
       - nonlinear model predictive control
       - locomotion control
       - motion control
+      - force control
+      - impedance control
+      - contact control
 
-# These topics are not absolutely blocked. They subtract score so that a strong
-# transferable robotics method can still pass the threshold.
+# These do not hard-block a paper; they lower its ranking/selection score.
 negative_groups:
   low_priority_domains:
-    weight: -6
+    weight: -8
     terms:
       - surgical robot
       - surgical robotics
@@ -259,12 +354,30 @@ negative_groups:
       - soft robotics
       - soft robot
       - continuum robot
+      - robot-assisted dressing
+      - assistive robot
+      - assistive robotics
 
   driving_only:
-    weight: -4
+    weight: -6
     terms:
       - autonomous driving
       - self-driving
       - autonomous vehicle
       - autonomous vehicles
       - driving policy
+      - end-to-end driving
+      - end to end driving
+
+  clearly_non_robotics:
+    weight: -10
+    terms:
+      - peer review
+      - ransomware
+      - malware
+      - cybersecurity
+      - image stylization
+      - image style transfer
+      - lens rendering
+      - infotainment
+      - collusive bidding
