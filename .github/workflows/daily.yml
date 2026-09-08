@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch and filter arXiv papers
+      - name: Fetch, filter, translate, and email arXiv papers
         env:
           MAIL_USER: ${{ secrets.MAIL_USER }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
@@ -45,7 +45,7 @@ jobs:
           SEND_EMAIL: ${{ inputs.send_email }}
         run: |
           if [ "$EVENT_NAME" = "schedule" ] || [ "$SEND_EMAIL" = "true" ]; then
-            python fetch_and_mail.py
+            python send_translated_digest.py
           else
-            python fetch_and_mail.py --dry-run
+            python send_translated_digest.py --dry-run
           fi
