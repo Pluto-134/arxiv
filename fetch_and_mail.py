@@ -11,7 +11,7 @@ import smtplib
 import ssl
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
@@ -33,7 +33,10 @@ class Paper:
     authors: str
     link: str
     abstract: str
+    categories: set[str] = field(default_factory=set)
     score: int = 0
+    gate_reason: str = ""
+    matched_groups: list[str] = field(default_factory=list)
 
 
 def clean_text(value: str) -> str:
@@ -79,7 +82,7 @@ def fetch_papers() -> list[Paper]:
     for category in CATEGORIES:
         url = RSS_BASE.format(category)
         print(f"Fetching {url}")
-        feed = feedparser.parse(url, request_headers={"User-Agent": "Pluto-arXiv-Daily/1.0"})
+        feed = feedparser.parse(url, request_headers={"User-Agent": "Pluto-arXiv-Daily/1.1"})
         if getattr(feed, "bozo", False):
             print(f"Warning: feed parser reported an issue for {category}: {feed.bozo_exception}", file=sys.stderr)
 
@@ -98,14 +101,17 @@ def fetch_papers() -> list[Paper]:
             abstract = clean_text(entry.get("summary", "") or entry.get("description", ""))
             authors = extract_authors(entry)
 
-            # Cross-listed papers can appear in several feeds; keep one copy.
-            if arxiv_id not in by_id:
+            # Cross-listed papers can appear in several feeds. Preserve every source category.
+            if arxiv_id in by_id:
+                by_id[arxiv_id].categories.add(category)
+            else:
                 by_id[arxiv_id] = Paper(
                     arxiv_id=arxiv_id,
                     title=title,
                     authors=authors,
                     link=link,
                     abstract=abstract,
+                    categories={category},
                 )
 
         # Be polite to arXiv when fetching several category feeds.
@@ -119,23 +125,52 @@ def load_rules(path: str = "keywords.yaml") -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def robotics_gate(paper: Paper, rules: dict[str, Any]) -> tuple[bool, str]:
+    """High-precision first-stage gate.
+
+    cs.RO papers are allowed to proceed to interest scoring because the category itself
+    is a strong robotics prior. Papers from AI/LG/CV/SY must contain an explicit robotics
+    or embodied-intelligence anchor; generic words such as navigation/manipulation do not
+    count as anchors by themselves.
+    """
+    full_text = f"{paper.title} {paper.abstract}"
+
+    for term in rules.get("strong_robot_anchors", []):
+        if contains_term(full_text, str(term)):
+            return True, f"anchor:{term}"
+
+    if "cs.RO" in paper.categories:
+        return True, "category:cs.RO"
+
+    return False, "no-explicit-robot-anchor"
+
+
 def score_paper(paper: Paper, rules: dict[str, Any]) -> int:
-    full_text = f"{paper.title} {paper.abstract}".lower()
-    title_text = paper.title.lower()
-    robot_context = any(contains_term(full_text, t) for t in rules.get("robot_context", []))
+    passed, gate_reason = robotics_gate(paper, rules)
+    paper.gate_reason = gate_reason
+    paper.matched_groups = []
+    if not passed:
+        return -999
+
+    full_text = f"{paper.title} {paper.abstract}"
+    title_text = paper.title
     title_bonus = int(rules.get("title_bonus", 0))
     score = 0
 
-    for group in rules.get("interest_groups", {}).values():
+    for group_name, group in rules.get("interest_groups", {}).items():
         terms = group.get("terms", [])
         matched = [term for term in terms if contains_term(full_text, str(term))]
         if not matched:
             continue
-        if group.get("requires_robot_context", False) and not robot_context:
-            continue
+
+        paper.matched_groups.append(group_name)
         score += int(group.get("weight", 0))
         if title_bonus and any(contains_term(title_text, str(term)) for term in matched):
             score += title_bonus
+
+    for category, bonus in rules.get("category_bonus", {}).items():
+        if category in paper.categories:
+            score += int(bonus)
 
     for group in rules.get("negative_groups", {}).values():
         if any(contains_term(full_text, str(term)) for term in group.get("terms", [])):
@@ -265,7 +300,9 @@ def main() -> int:
     print(f"Fetched {len(papers)} unique papers across {len(CATEGORIES)} categories.")
     print(f"Selected {len(selected)} papers (threshold={rules.get('threshold', 5)}).")
     for paper in selected:
-        print(f"[{paper.score:>2}] {paper.title} | {paper.link}")
+        cats = ",".join(sorted(paper.categories))
+        groups = ",".join(paper.matched_groups)
+        print(f"[{paper.score:>2}] [{cats}] [{paper.gate_reason}] [{groups}] {paper.title} | {paper.link}")
 
     subject, plain, html_body = build_email(selected)
     if args.dry_run:
