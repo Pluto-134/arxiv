@@ -1,12 +1,19 @@
 # High-precision robotics paper filtering rules.
 # Stage 1: an explicit robotics/embodied anchor OR cs.RO membership is required.
 # Stage 2: interest groups are scored from title + abstract.
+#
+# Important design rule:
+# - Generic platform words (quadruped / humanoid / UAV / drone / quadrotor) do NOT
+#   prove robotics relevance by themselves outside cs.RO.
+# - Outside cs.RO, platform papers should normally contain a task-bearing phrase
+#   such as quadrotor control, UAV navigation, quadruped locomotion, etc.
 
 threshold: 5
 title_bonus: 2
 
-# These terms are allowed to prove robotics/embodied relevance by themselves.
-# Generic words such as manipulation/navigation/world model are intentionally NOT here.
+# Terms that are strong enough to prove robotics/embodied relevance by themselves.
+# Generic method words (navigation/manipulation/world model) and generic platform
+# nouns are intentionally excluded unless they appear in a robotics task phrase.
 strong_robot_anchors:
   - robot
   - robotic
@@ -15,31 +22,72 @@ strong_robot_anchors:
   - mobile robot
   - field robot
   - service robot
-  - manipulator
+  - robot manipulator
+  - robotic manipulator
   - robotic arm
   - robot arm
   - robotic hand
   - robot hand
-  - dexterous hand
+  - dexterous robotic hand
+  - dexterous hand manipulation
   - robot manipulation
   - robotic manipulation
   - robotic grasping
   - mobile manipulation
   - loco-manipulation
-  - humanoid
+
+  # Legged / humanoid: require explicit robotics or task semantics.
   - humanoid robot
+  - humanoid robotics
+  - humanoid locomotion
+  - humanoid navigation
+  - humanoid manipulation
+  - humanoid control
   - bipedal robot
-  - quadruped
-  - quadrupedal
+  - biped locomotion
+  - quadruped robot
+  - quadrupedal robot
+  - quadruped locomotion
+  - quadrupedal locomotion
+  - quadruped navigation
+  - quadrupedal navigation
+  - quadruped control
+  - quadrupedal control
   - legged robot
   - legged robotics
+  - legged locomotion
+  - legged navigation
+  - legged control
   - robot locomotion
-  - uav
-  - drone
-  - quadrotor
+
+  # UAV / aerial: a platform noun alone is not enough outside cs.RO.
   - aerial robot
   - aerial robotics
   - micro aerial vehicle
+  - aerial manipulation
+  - autonomous flight
+  - agile flight
+  - uav navigation
+  - uav planning
+  - uav control
+  - uav trajectory
+  - uav exploration
+  - uav mapping
+  - drone navigation
+  - drone planning
+  - drone control
+  - drone trajectory
+  - drone exploration
+  - drone mapping
+  - quadrotor navigation
+  - quadrotor planning
+  - quadrotor control
+  - quadrotor trajectory
+  - quadrotor exploration
+  - quadrotor mapping
+  - quadrotor perception
+
+  # Embodied intelligence / foundation models.
   - embodied ai
   - embodied intelligence
   - embodied agent
@@ -108,6 +156,8 @@ interest_groups:
     terms:
       - quadruped
       - quadrupedal
+      - quadruped robot
+      - quadrupedal robot
       - legged robot
       - legged robotics
       - legged locomotion
@@ -357,6 +407,54 @@ negative_groups:
       - robot-assisted dressing
       - assistive robot
       - assistive robotics
+
+  prototype_hri:
+    weight: -6
+    terms:
+      - humanoid robot prototype
+      - robot prototype for
+      - multimodal human-robot interaction
+      - multimodal human robot interaction
+      - social interaction robot
+      - gesture-based human-robot interaction
+      - voice-based human-robot interaction
+
+  telecom_remote_control:
+    weight: -8
+    terms:
+      - wireless communication
+      - wireless control
+      - wireless world model
+      - remote robotic control
+      - remote robot control
+      - communication-aware control
+      - communication aware control
+      - networked robot control
+      - networked robotic control
+
+  graphics_animation:
+    weight: -12
+    terms:
+      - character animation
+      - skeletal animation
+      - skeleton animation
+      - animate diverse skeletons
+      - motion retargeting
+      - motion animation
+      - character rigging
+      - rigged character
+
+  gis_spatial_positioning:
+    weight: -8
+    terms:
+      - geographic information system
+      - geospatial analysis
+      - spatial reference point
+      - spatial reference points
+      - geodesic voronoi
+      - topographic manifold
+      - topographic manifolds
+      - facility location
 
   driving_only:
     weight: -6
