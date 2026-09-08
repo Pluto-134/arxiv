@@ -30,4 +30,4 @@ jobs:
           SMTP_MODE: ${{ secrets.SMTP_MODE }}
         run: python fetch_and_mail.py
 
-# one-time trigger: 2026-09-08 fallback test
+# one-time trigger: 2026-09-08 API fallback test
