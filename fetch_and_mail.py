@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch daily arXiv RSS feeds, filter robotics papers, and email a compact digest."""
+"""Fetch latest arXiv papers, filter robotics interests, and email a compact digest."""
 
 from __future__ import annotations
 
@@ -16,14 +16,18 @@ from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
+from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 import feedparser
 import yaml
+from bs4 import BeautifulSoup
 
 CATEGORIES = ["cs.RO", "cs.AI", "cs.LG", "cs.CV", "eess.SY"]
 RSS_BASE = "https://rss.arxiv.org/rss/{}"
+NEW_LIST_BASE = "https://arxiv.org/list/{}/new?show=2000"
 TIMEZONE = ZoneInfo("Asia/Shanghai")
+USER_AGENT = "Pluto-arXiv-Daily/1.2 (+https://github.com/Pluto-134/arxiv)"
 
 
 @dataclass
@@ -76,45 +80,138 @@ def extract_authors(entry: Any) -> str:
     return clean_text(str(raw))
 
 
+def merge_paper(by_id: dict[str, Paper], paper: Paper) -> None:
+    existing = by_id.get(paper.arxiv_id)
+    if existing is None:
+        by_id[paper.arxiv_id] = paper
+        return
+
+    existing.categories.update(paper.categories)
+    if not existing.abstract and paper.abstract:
+        existing.abstract = paper.abstract
+    if (not existing.authors or existing.authors == "Unknown authors") and paper.authors:
+        existing.authors = paper.authors
+
+
+def fetch_rss_category(category: str, by_id: dict[str, Paper]) -> int:
+    """Fetch new/cross-listed entries from one RSS feed. Return accepted entry count."""
+    url = RSS_BASE.format(category)
+    print(f"Fetching RSS {url}")
+    feed = feedparser.parse(url, request_headers={"User-Agent": USER_AGENT})
+    if getattr(feed, "bozo", False):
+        print(f"Warning: RSS parser issue for {category}: {feed.bozo_exception}", file=sys.stderr)
+
+    accepted = 0
+    for entry in feed.entries:
+        announce_type = str(entry.get("arxiv_announce_type", "")).lower().strip()
+        if announce_type and announce_type not in {"new", "cross", "cross-list"}:
+            continue
+
+        raw_link = entry.get("link", "")
+        arxiv_id, link = normalize_arxiv_link(raw_link)
+        if not arxiv_id:
+            continue
+
+        merge_paper(
+            by_id,
+            Paper(
+                arxiv_id=arxiv_id,
+                title=clean_text(entry.get("title", "")),
+                authors=extract_authors(entry),
+                link=link,
+                abstract=clean_text(entry.get("summary", "") or entry.get("description", "")),
+                categories={category},
+            ),
+        )
+        accepted += 1
+
+    return accepted
+
+
+def extract_list_categories(subject_text: str) -> set[str]:
+    cats = set(re.findall(r"\(([A-Za-z.-]+)\)", subject_text or ""))
+    return {cat for cat in cats if cat in CATEGORIES}
+
+
+def fetch_new_list_category(category: str, by_id: dict[str, Paper]) -> int:
+    """Fallback: scrape arXiv /new, keeping New submissions + Cross-lists only."""
+    url = NEW_LIST_BASE.format(category)
+    print(f"RSS empty for {category}; falling back to {url}")
+    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html"})
+    with urlopen(request, timeout=30) as response:
+        soup = BeautifulSoup(response.read(), "html.parser")
+
+    accepted = 0
+    for heading in soup.find_all("h3"):
+        heading_text = clean_text(heading.get_text(" ", strip=True)).lower()
+        if not (heading_text.startswith("new submissions") or heading_text.startswith("cross-lists")):
+            continue
+
+        listing = heading.find_next_sibling("dl")
+        if listing is None:
+            continue
+
+        dts = listing.find_all("dt", recursive=False)
+        dds = listing.find_all("dd", recursive=False)
+        for dt, dd in zip(dts, dds):
+            abs_link = dt.find("a", href=re.compile(r"^/abs/"))
+            if abs_link is None:
+                continue
+
+            href = str(abs_link.get("href", ""))
+            arxiv_id = re.sub(r"^/abs/", "", href).split("v", 1)[0]
+            if not arxiv_id:
+                continue
+
+            title_div = dd.find("div", class_="list-title")
+            title = clean_text(title_div.get_text(" ", strip=True) if title_div else "")
+            title = re.sub(r"^Title:\s*", "", title, flags=re.IGNORECASE)
+
+            authors_div = dd.find("div", class_="list-authors")
+            if authors_div:
+                names = [clean_text(a.get_text(" ", strip=True)) for a in authors_div.find_all("a")]
+                authors = ", ".join(name for name in names if name)
+                if not authors:
+                    authors = re.sub(
+                        r"^Authors?:\s*", "", clean_text(authors_div.get_text(" ", strip=True)), flags=re.IGNORECASE
+                    )
+            else:
+                authors = "Unknown authors"
+
+            abstract_p = dd.find("p", class_="mathjax")
+            abstract = clean_text(abstract_p.get_text(" ", strip=True) if abstract_p else "")
+
+            subjects_div = dd.find("div", class_="list-subjects")
+            subjects_text = clean_text(subjects_div.get_text(" ", strip=True) if subjects_div else "")
+            categories = {category} | extract_list_categories(subjects_text)
+
+            merge_paper(
+                by_id,
+                Paper(
+                    arxiv_id=arxiv_id,
+                    title=title,
+                    authors=authors,
+                    link=f"https://arxiv.org/abs/{arxiv_id}",
+                    abstract=abstract,
+                    categories=categories,
+                ),
+            )
+            accepted += 1
+
+    print(f"Fallback {category}: accepted {accepted} new/cross-listed entries")
+    return accepted
+
+
 def fetch_papers() -> list[Paper]:
     by_id: dict[str, Paper] = {}
 
     for category in CATEGORIES:
-        url = RSS_BASE.format(category)
-        print(f"Fetching {url}")
-        feed = feedparser.parse(url, request_headers={"User-Agent": "Pluto-arXiv-Daily/1.1"})
-        if getattr(feed, "bozo", False):
-            print(f"Warning: feed parser reported an issue for {category}: {feed.bozo_exception}", file=sys.stderr)
-
-        for entry in feed.entries:
-            announce_type = str(entry.get("arxiv_announce_type", "")).lower().strip()
-            # Daily digest focuses on newly announced/cross-listed work, not revisions.
-            if announce_type and announce_type not in {"new", "cross", "cross-list"}:
-                continue
-
-            raw_link = entry.get("link", "")
-            arxiv_id, link = normalize_arxiv_link(raw_link)
-            if not arxiv_id:
-                continue
-
-            title = clean_text(entry.get("title", ""))
-            abstract = clean_text(entry.get("summary", "") or entry.get("description", ""))
-            authors = extract_authors(entry)
-
-            # Cross-listed papers can appear in several feeds. Preserve every source category.
-            if arxiv_id in by_id:
-                by_id[arxiv_id].categories.add(category)
-            else:
-                by_id[arxiv_id] = Paper(
-                    arxiv_id=arxiv_id,
-                    title=title,
-                    authors=authors,
-                    link=link,
-                    abstract=abstract,
-                    categories={category},
-                )
-
-        # Be polite to arXiv when fetching several category feeds.
+        rss_count = fetch_rss_category(category, by_id)
+        if rss_count == 0:
+            try:
+                fetch_new_list_category(category, by_id)
+            except Exception as exc:
+                print(f"Warning: HTML fallback failed for {category}: {exc}", file=sys.stderr)
         time.sleep(1)
 
     return list(by_id.values())
@@ -187,7 +284,6 @@ def filter_papers(papers: list[Paper], rules: dict[str, Any]) -> list[Paper]:
         if paper.score >= threshold:
             selected.append(paper)
 
-    # Most relevant first; title is only a deterministic tie-breaker.
     selected.sort(key=lambda p: (-p.score, p.title.lower()))
     return selected
 
