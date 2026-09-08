@@ -1,6 +1,6 @@
 # arXiv Robotics Daily
 
-每天自动从 arXiv 抓取最新论文，按个人机器人研究兴趣进行关键词评分筛选，并通过邮件发送精简列表：**标题、作者、arXiv 链接**。
+每天自动从 arXiv 抓取最新论文，按个人机器人研究兴趣进行两阶段筛选，并通过邮件发送精简列表：**标题、作者、arXiv 链接**。
 
 ## 关注方向
 
@@ -15,7 +15,7 @@
 - VLA / Robot Foundation Models
 - Embodied AI / Robot Reasoning
 - Robot World Models
-- Navigation / Path Planning / Trajectory Optimization
+- Navigation / Path Planning / Trajectory Optimization / TAMP / VLN
 - Active Perception / Exploration / FOV-aware Planning
 - SLAM / Mapping / 3D Scene Representation
 - Traversability / Terrain Perception / Stairs / Negative Obstacles
@@ -35,7 +35,24 @@ GitHub Action 会读取以下 arXiv RSS 分类并去重：
 - `cs.CV` — Computer Vision
 - `eess.SY` — Systems and Control
 
-筛选时使用 **Title + Abstract**，邮件中只显示 Title / Authors / Link。
+筛选时使用 **Title + Abstract**，并保留论文出现过的 arXiv 分类。邮件中只显示 Title / Authors / Link。
+
+## 筛选逻辑
+
+当前采用两阶段高精度筛选：
+
+### 1. Robotics relevance gate
+
+论文首先必须满足下面之一：
+
+- 出现在 `cs.RO`；或
+- 标题/摘要出现明确的机器人或 embodied intelligence 锚点，例如 `robot`、`quadruped`、`humanoid`、`UAV`、`quadrotor`、`vision-language-action`、`embodied agent`、`robotic hand` 等。
+
+`navigation`、`manipulation`、`world model`、`reinforcement learning` 等泛方法词**不能单独证明机器人相关性**，从而避免把纯 CV、网络安全、自动驾驶等论文误收进来。
+
+### 2. Interest scoring
+
+通过第一阶段后，再根据兴趣方向累计分数。标题直接命中关键词会额外加分，`cs.RO` 也有小幅排序加成；低优先级领域会扣分。
 
 ## 自动运行时间
 
@@ -104,8 +121,8 @@ Gmail 会自动使用：
 2. 打开仓库的 **Actions**。
 3. 选择 **Daily arXiv Robotics Digest**。
 4. 点击 **Run workflow**。
-5. 第一次建议 `send_email = false`，检查日志中的筛选结果。
-6. 再运行一次并设置 `send_email = true`，确认收到邮件。
+5. `send_email = false` 可查看筛选结果但不发邮件。
+6. `send_email = true` 会实际发送邮件。
 
 ## 修改筛选兴趣
 
@@ -121,12 +138,13 @@ title_bonus: 2
 - `threshold` 越高：论文越少、越精准。
 - `threshold` 越低：论文越多、召回率越高。
 - `title_bonus`：关键词直接出现在标题时额外加分。
+- `strong_robot_anchors`：非 `cs.RO` 论文必须先命中其中至少一个锚点，才进入兴趣评分。
 
 每个兴趣组都有独立权重。例如：
 
 ```yaml
 vla_foundation_models:
-  weight: 9
+  weight: 10
   terms:
     - vision-language-action
     - robot foundation model
@@ -141,7 +159,7 @@ pip install -r requirements.txt
 python fetch_and_mail.py --dry-run
 ```
 
-`--dry-run` 不需要邮箱 Secrets，只会在终端输出当天筛选结果和邮件预览。
+`--dry-run` 不需要邮箱 Secrets，只会在终端输出当天筛选结果和邮件预览。日志还会显示论文分类、通过 gate 的原因以及命中的兴趣组，方便继续调规则。
 
 ## 文件结构
 
