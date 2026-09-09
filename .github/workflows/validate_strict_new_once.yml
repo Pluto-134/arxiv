@@ -22,15 +22,21 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Count strict new papers
+      - name: Count and rank strict new papers
         run: |
           python - <<'PY'
           from daily_source import fetch_papers
+          from daily_ranker import ranking_score, select_daily_papers
           from fetch_and_mail import filter_papers, load_rules
+
+          rules = load_rules()
           papers = fetch_papers()
-          selected = filter_papers(papers, load_rules())
+          relevant = filter_papers(papers, rules)
+          selected = select_daily_papers(papers, rules)
+
           print(f"STRICT_NEW_CANDIDATES={len(papers)}")
-          print(f"STRICT_NEW_SELECTED={len(selected)}")
+          print(f"RELEVANT_BEFORE_CAP={len(relevant)}")
+          print(f"FINAL_DAILY_SELECTED={len(selected)}")
           for p in selected:
-              print(f"[{p.score:>2}] {p.title} | {p.link}")
+              print(f"[rank={ranking_score(p):>2} raw={p.score:>2}] {','.join(p.matched_groups)} | {p.title} | {p.link}")
           PY
