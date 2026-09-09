@@ -2,8 +2,11 @@ name: Daily arXiv Robotics Digest
 
 on:
   schedule:
-    # 02:15 UTC = 10:15 Asia/Shanghai. arXiv announces papers on weekdays.
+    # Beijing time: 10:15, 10:45, 11:15 on weekdays.
+    # Multiple triggers compensate for occasional GitHub schedule delays/drops.
     - cron: "15 2 * * 1-5"
+    - cron: "45 2 * * 1-5"
+    - cron: "15 3 * * 1-5"
   workflow_dispatch:
     inputs:
       send_email:
@@ -11,9 +14,18 @@ on:
         required: true
         default: false
         type: boolean
+      force_send:
+        description: "Ignore today's sent marker and send again"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: arxiv-daily-send
+  cancel-in-progress: false
 
 jobs:
   digest:
@@ -21,8 +33,10 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout
+      - name: Checkout latest main
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,7 +47,40 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Decide whether to send
+        id: decision
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SEND_EMAIL: ${{ inputs.send_email }}
+          FORCE_SEND: ${{ inputs.force_send }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TODAY="$(TZ=Asia/Shanghai date +%F)"
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+
+          if [[ "$EVENT_NAME" != "schedule" && "$SEND_EMAIL" != "true" ]]; then
+            echo "mode=preview" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin main
+          LAST_SENT="$(git show origin/main:.state/last_sent_date 2>/dev/null | tr -d '\r\n' || true)"
+          echo "Last sent marker: ${LAST_SENT:-<none>}"
+
+          if [[ "$FORCE_SEND" != "true" && "$LAST_SENT" == "$TODAY" ]]; then
+            echo "Already sent for $TODAY; skipping duplicate."
+            echo "mode=skip" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=send" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Preview digest
+        if: ${{ steps.decision.outputs.mode == 'preview' }}
+        run: python send_translated_digest.py --dry-run
+
       - name: Fetch, filter, translate, and email arXiv papers
+        if: ${{ steps.decision.outputs.mode == 'send' }}
         env:
           MAIL_USER: ${{ secrets.MAIL_USER }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
@@ -41,11 +88,20 @@ jobs:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_MODE: ${{ secrets.SMTP_MODE }}
-          EVENT_NAME: ${{ github.event_name }}
-          SEND_EMAIL: ${{ inputs.send_email }}
+        run: python send_translated_digest.py
+
+      - name: Mark today as sent
+        if: ${{ steps.decision.outputs.mode == 'send' && success() }}
+        env:
+          TODAY: ${{ steps.decision.outputs.today }}
+        shell: bash
         run: |
-          if [ "$EVENT_NAME" = "schedule" ] || [ "$SEND_EMAIL" = "true" ]; then
-            python send_translated_digest.py
-          else
-            python send_translated_digest.py --dry-run
-          fi
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --ff-only origin main
+          mkdir -p .state
+          printf '%s\n' "$TODAY" > .state/last_sent_date
+          git add .state/last_sent_date
+          git commit -m "chore: mark arXiv digest sent $TODAY" || exit 0
+          git push origin main
