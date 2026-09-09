@@ -13,7 +13,8 @@ from datetime import datetime
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from fetch_and_mail import TIMEZONE, USER_AGENT, fetch_papers, filter_papers, load_rules, send_email
+from daily_source import fetch_papers
+from fetch_and_mail import TIMEZONE, USER_AGENT, filter_papers, load_rules, send_email
 
 
 TRANSLATION_FALLBACK = "（翻译暂不可用）"
@@ -168,7 +169,7 @@ def main() -> int:
     papers = fetch_papers()
     selected = filter_papers(papers, rules)
 
-    print(f"Fetched {len(papers)} unique papers.")
+    print(f"Fetched {len(papers)} unique new papers.")
     print(f"Selected {len(selected)} papers for translated digest.")
     for paper in selected:
         print(f"[{paper.score:>2}] {paper.title} | {paper.link}")
