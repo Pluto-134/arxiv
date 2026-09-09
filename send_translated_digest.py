@@ -58,7 +58,7 @@ def translate_chunk(text: str) -> str:
         f"{TRANSLATE_ENDPOINT}?{params}",
         headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
     )
-    with urlopen(request, timeout=20) as response:
+    with urlopen(request, timeout=6) as response:
         payload = json.loads(response.read().decode("utf-8"))
     translated = "".join(part[0] for part in payload[0] if part and part[0])
     return translated.strip()
@@ -72,7 +72,7 @@ def translate_text(text: str) -> str:
     translated_chunks: list[str] = []
     for chunk in chunks:
         translated = ""
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 translated = translate_chunk(chunk)
                 lowered = translated.lower()
@@ -81,12 +81,12 @@ def translate_text(text: str) -> str:
                 translated = ""
             except Exception as exc:
                 print(f"Warning: translation attempt {attempt + 1} failed: {exc}", file=sys.stderr)
-            time.sleep(0.8 * (attempt + 1))
+            time.sleep(0.5 * (attempt + 1))
 
         if not translated:
             return ""
         translated_chunks.append(translated)
-        time.sleep(0.12)
+        time.sleep(0.08)
 
     return " ".join(translated_chunks).strip()
 
