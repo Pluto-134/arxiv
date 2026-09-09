@@ -13,8 +13,9 @@ from datetime import datetime
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from daily_ranker import ranking_score, select_daily_papers
 from daily_source import fetch_papers
-from fetch_and_mail import TIMEZONE, USER_AGENT, filter_papers, load_rules, send_email
+from fetch_and_mail import TIMEZONE, USER_AGENT, load_rules, send_email
 
 
 TRANSLATION_FALLBACK = "（翻译暂不可用）"
@@ -22,7 +23,6 @@ TRANSLATE_ENDPOINT = "https://translate.googleapis.com/translate_a/single"
 
 
 def split_for_translation(text: str, max_chars: int = 2400) -> list[str]:
-    """Split long abstracts at sentence/whitespace boundaries to keep requests small."""
     text = (text or "").strip()
     if not text:
         return []
@@ -167,12 +167,12 @@ def main() -> int:
 
     rules = load_rules(args.rules)
     papers = fetch_papers()
-    selected = filter_papers(papers, rules)
+    selected = select_daily_papers(papers, rules)
 
     print(f"Fetched {len(papers)} unique new papers.")
-    print(f"Selected {len(selected)} papers for translated digest.")
+    print(f"Selected top {len(selected)} papers for translated digest.")
     for paper in selected:
-        print(f"[{paper.score:>2}] {paper.title} | {paper.link}")
+        print(f"[rank={ranking_score(paper):>2} raw={paper.score:>2}] {paper.title} | {paper.link}")
 
     subject, plain, html_body = build_translated_email(selected)
     if args.dry_run:
